@@ -33,21 +33,14 @@ jobs:
         run: |
           set -euo pipefail
           zsh scripts/build-app.sh --skip-build
-          codesign --force --deep --sign - dist/uMacCleaner.app
-          ditto -c -k --sequesterRsrc --keepParent dist/uMacCleaner.app dist/uMacCleaner-macos-arm64.zip
-          cp .build/release/mclean dist/mclean
-          ditto -c -k --sequesterRsrc --keepParent dist/mclean dist/mclean-macos-arm64.zip
-          cd dist
-          shasum -a 256 uMacCleaner-macos-arm64.zip mclean-macos-arm64.zip > SHA256SUMS
+          codesign --force --deep --sign - dist/uMacCleaner-GUI.app
+          ditto -c -k --sequesterRsrc --keepParent dist/uMacCleaner-GUI.app dist/uMacCleaner-GUI-macOS-arm64.zip
 
       - name: Upload downloadable build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: uMacCleaner-macos-arm64
-          path: |
-            dist/uMacCleaner-macos-arm64.zip
-            dist/mclean-macos-arm64.zip
-            dist/SHA256SUMS
+          name: uMacCleaner-GUI-macOS-arm64
+          path: dist/uMacCleaner-GUI-macOS-arm64.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -59,6 +52,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - name: Ensure GitHub CLI is available
         shell: bash
         run: |
@@ -68,7 +63,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: uMacCleaner-macos-arm64
+          name: uMacCleaner-GUI-macOS-arm64
           path: release-assets
 
       - name: Attach downloads to release
@@ -80,16 +75,22 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          assets=(
-            release-assets/uMacCleaner-macos-arm64.zip
-            release-assets/mclean-macos-arm64.zip
-            release-assets/SHA256SUMS
-          )
+          version="v$(tr -d '[:space:]' < VERSION)"
+          [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid VERSION: $version" >&2; exit 1; }
+          asset="release-assets/uMacCleaner-GUI-macOS-arm64.zip"
+          checksum="$(shasum -a 256 "$asset" | awk '{print $1}')"
+          notes="SHA-256 of uMacCleaner-GUI-macOS-arm64.zip: $checksum"
           if [[ "$REF_TYPE" == "tag" ]]; then
-            gh release create "$REF_NAME" "${assets[@]}" --verify-tag --generate-notes
+            [[ "$REF_NAME" == "$version" ]] || { echo "Tag $REF_NAME does not match VERSION $version" >&2; exit 1; }
+            tag="$REF_NAME"
+            tag_options=(--verify-tag)
           else
-            short_sha="${COMMIT_SHA:0:12}"
-            gh release create "build-$short_sha" "${assets[@]}" \
-              --target "$COMMIT_SHA" --prerelease \
-              --title "Development build $short_sha" --generate-notes
+            tag="$version"
+            tag_options=(--target "$COMMIT_SHA")
           fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; bump VERSION for the next release."
+            exit 0
+          fi
+          gh release create "$tag" "$asset" "${tag_options[@]}" \
+            --title "$tag" --notes "$notes" --generate-notes

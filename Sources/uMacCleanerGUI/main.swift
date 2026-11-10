@@ -159,7 +159,7 @@ enum AppPage {
     }
 }
 
-@main struct MacCleanerApp: App {
+@main struct uMacCleanerGUIApp: App {
     @State private var model = CleanerModel()
 
     var body: some Scene {

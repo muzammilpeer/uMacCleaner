@@ -4,11 +4,11 @@ import Foundation
 let args = Array(CommandLine.arguments.dropFirst())
 func usage() {
     print("""
-    mclean scan [--json] [--category caches|logs|developer]
-    mclean trace
-    mclean docker
-    mclean docker-prune-build --yes
-    mclean clean --yes [--category caches|logs|developer]
+    uMacCleaner-CLI scan [--json] [--category caches|logs|developer]
+    uMacCleaner-CLI trace
+    uMacCleaner-CLI docker
+    uMacCleaner-CLI docker-prune-build --yes
+    uMacCleaner-CLI clean --yes [--category caches|logs|developer]
 
     Clean moves the scanned items to Trash. Close apps before cleaning their caches.
     """)

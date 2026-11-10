@@ -5,13 +5,13 @@ let package = Package(
     name: "uMacCleaner",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "MacCleaner", targets: ["MacCleaner"]),
-        .executable(name: "mclean", targets: ["mclean"])
+        .executable(name: "uMacCleaner-GUI", targets: ["uMacCleanerGUI"]),
+        .executable(name: "uMacCleaner-CLI", targets: ["uMacCleanerCLI"])
     ],
     targets: [
         .target(name: "CleanerCore"),
-        .executableTarget(name: "MacCleaner", dependencies: ["CleanerCore"]),
-        .executableTarget(name: "mclean", dependencies: ["CleanerCore"]),
+        .executableTarget(name: "uMacCleanerGUI", dependencies: ["CleanerCore"]),
+        .executableTarget(name: "uMacCleanerCLI", dependencies: ["CleanerCore"]),
         .testTarget(name: "CleanerCoreTests", dependencies: ["CleanerCore"])
     ]
 )

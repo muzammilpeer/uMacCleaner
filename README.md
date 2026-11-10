@@ -6,21 +6,21 @@ The GUI also supports name/path filtering, size/name/category sorting, select/de
 
 ## Run
 
-- GUI: `swift run MacCleaner`
-- App bundle: `zsh scripts/build-app.sh`, then open `dist/uMacCleaner.app`
-- CLI preview: `swift run mclean scan`
-- CLI JSON: `swift run mclean scan --json`
-- CLI System Data trace: `swift run mclean trace`
-- Docker disk usage: `swift run mclean docker`
-- Docker build cache cleanup: `swift run mclean docker-prune-build --yes`
-- CLI cleanup: `swift run mclean clean --yes --category logs`
+- GUI: `swift run uMacCleaner-GUI`
+- App bundle: `zsh scripts/build-app.sh`, then open `dist/uMacCleaner-GUI.app`
+- CLI preview: `swift run uMacCleaner-CLI scan`
+- CLI JSON: `swift run uMacCleaner-CLI scan --json`
+- CLI System Data trace: `swift run uMacCleaner-CLI trace`
+- Docker disk usage: `swift run uMacCleaner-CLI docker`
+- Docker build cache cleanup: `swift run uMacCleaner-CLI docker-prune-build --yes`
+- CLI cleanup: `swift run uMacCleaner-CLI clean --yes --category logs`
 - Tests: `swift test`
 
 The app requires macOS 14 or later. macOS may ask for file access. Close active apps before removing their caches; some files will be recreated. Trash can be emptied later in Finder.
 
 ## CI and releases
 
-GitHub Actions runs tests and builds both binaries on pushes to `main`, pull requests, and manual runs. Each successful run offers a downloadable macOS arm64 artifact. Pushing a version tag such as `v0.1.0` also creates a GitHub Release with the app ZIP, CLI ZIP, and SHA-256 checksums attached.
+GitHub Actions runs tests, builds both binaries, and publishes releases on a runner with the `self-hosted` label. This workflow requires that runner to be a macOS ARM64 machine. It runs for pushes to `master`, pull requests targeting `master`, version tags, and manual triggers. Each successful build offers one downloadable ZIP named `uMacCleaner-GUI-macOS-arm64.zip`; the CLI binary is inside `uMacCleaner-GUI.app/Contents/MacOS/uMacCleaner-CLI`. A push to `master` publishes the version in `VERSION` (initially `v0.1.0`) if that release does not already exist. To publish another version, bump `VERSION` and push to `master`, or push a matching `v*` tag. The ZIP's SHA-256 checksum is in the release notes. GitHub automatically adds source-code archive links to every release. Pull requests and manual runs upload workflow artifacts but do not publish releases. The runner needs Xcode/Swift and Homebrew; the release job installs GitHub CLI through Homebrew if it is missing.
 
 The app is ad hoc signed for packaging but is **not notarized**. macOS Gatekeeper may require users to approve opening a downloaded build. A public release should later use an Apple Developer ID certificate and notarization.
 
