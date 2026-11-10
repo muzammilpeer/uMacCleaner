@@ -35,12 +35,16 @@ jobs:
           zsh scripts/build-app.sh --skip-build
           codesign --force --deep --sign - dist/uMacCleaner-GUI.app
           ditto -c -k --sequesterRsrc --keepParent dist/uMacCleaner-GUI.app dist/uMacCleaner-GUI-macOS-arm64.zip
+          cp dist/uMacCleaner-GUI.app/Contents/MacOS/uMacCleaner-CLI dist/uMacCleaner-CLI
+          /usr/bin/zip -j -X -q dist/uMacCleaner-CLI-macOS-arm64.zip dist/uMacCleaner-CLI
 
       - name: Upload downloadable build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: uMacCleaner-GUI-macOS-arm64
-          path: dist/uMacCleaner-GUI-macOS-arm64.zip
+          name: uMacCleaner-macOS-arm64
+          path: |
+            dist/uMacCleaner-GUI-macOS-arm64.zip
+            dist/uMacCleaner-CLI-macOS-arm64.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -63,7 +67,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: uMacCleaner-GUI-macOS-arm64
+          name: uMacCleaner-macOS-arm64
           path: release-assets
 
       - name: Attach downloads to release
@@ -77,9 +81,12 @@ jobs:
           set -euo pipefail
           version="v$(tr -d '[:space:]' < VERSION)"
           [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid VERSION: $version" >&2; exit 1; }
-          asset="release-assets/uMacCleaner-GUI-macOS-arm64.zip"
-          checksum="$(shasum -a 256 "$asset" | awk '{print $1}')"
-          notes="SHA-256 of uMacCleaner-GUI-macOS-arm64.zip: $checksum"
+          gui_asset="release-assets/uMacCleaner-GUI-macOS-arm64.zip"
+          cli_asset="release-assets/uMacCleaner-CLI-macOS-arm64.zip"
+          gui_checksum="$(shasum -a 256 "$gui_asset" | awk '{print $1}')"
+          cli_checksum="$(shasum -a 256 "$cli_asset" | awk '{print $1}')"
+          notes="SHA-256 of uMacCleaner-GUI-macOS-arm64.zip: $gui_checksum
+          SHA-256 of uMacCleaner-CLI-macOS-arm64.zip: $cli_checksum"
           if [[ "$REF_TYPE" == "tag" ]]; then
             [[ "$REF_NAME" == "$version" ]] || { echo "Tag $REF_NAME does not match VERSION $version" >&2; exit 1; }
             tag="$REF_NAME"
@@ -89,8 +96,27 @@ jobs:
             tag_options=(--target "$COMMIT_SHA")
           fi
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; bump VERSION for the next release."
+            if gh release view "$tag" --json assets --jq '.assets[].name' | grep -Fxq 'uMacCleaner-CLI-macOS-arm64.zip'; then
+              echo "Release $tag already has the CLI download."
+              exit 0
+            fi
+            # Build the missing CLI download from the app already attached to this
+            # version, so the new asset matches the existing release tag.
+            temp_dir="$(mktemp -d)"
+            trap 'rm -rf "$temp_dir"' EXIT
+            gh release download "$tag" --pattern 'uMacCleaner-GUI-macOS-arm64.zip' --dir "$temp_dir"
+            unzip -p "$temp_dir/uMacCleaner-GUI-macOS-arm64.zip" \
+              'uMacCleaner-GUI.app/Contents/MacOS/uMacCleaner-CLI' > "$temp_dir/uMacCleaner-CLI"
+            chmod +x "$temp_dir/uMacCleaner-CLI"
+            /usr/bin/zip -j -X -q \
+              "$temp_dir/uMacCleaner-CLI-macOS-arm64.zip" "$temp_dir/uMacCleaner-CLI"
+            gh release upload "$tag" "$temp_dir/uMacCleaner-CLI-macOS-arm64.zip"
+            gh release view "$tag" --json body --jq .body > "$temp_dir/notes.txt"
+            printf '\nSHA-256 of uMacCleaner-CLI-macOS-arm64.zip: %s\n' \
+              "$(shasum -a 256 "$temp_dir/uMacCleaner-CLI-macOS-arm64.zip" | awk '{print $1}')" \
+              >> "$temp_dir/notes.txt"
+            gh release edit "$tag" --notes-file "$temp_dir/notes.txt"
             exit 0
           fi
-          gh release create "$tag" "$asset" "${tag_options[@]}" \
+          gh release create "$tag" "$gui_asset" "$cli_asset" "${tag_options[@]}" \
             --title "$tag" --notes "$notes" --generate-notes
